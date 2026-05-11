@@ -1,7 +1,7 @@
 # Gym-Passion-Project
 
-Everyone knows that progress within the gym starts with the diet, which is arguably harder than going to the gym
-Whether it's tracking macros, making sure the food you eat fits within your calorie goals, or even contemplating that late-night snack, food is difficult to deal with
+Everyone knows that progress within the gym starts with the diet, which is arguably harder than going to the gym.
+Whether it's tracking macros, making sure the food you eat fits within your calorie goals, or even contemplating that late-night snack, food is difficult to deal with.
 
 As an avid gym-goer, I decided to create something that would help me with what to purchase for my meals that week. 
 
