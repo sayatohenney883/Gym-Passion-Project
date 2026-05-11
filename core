@@ -1,1 +1,1 @@
-print(hello)
+int(input("Please enter your desired calories for the week here")
