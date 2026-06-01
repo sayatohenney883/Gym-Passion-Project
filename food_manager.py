@@ -2,32 +2,43 @@ import json
 
 class WeeklyMealPlan:
     def __init__(self, targets):
-        self.targets = targets # Expects {'budget': 50, 'protein': 700, etc.}
+        self.targets = targets 
         self.current_totals = {"calories": 0, "protein": 0, "fat": 0, "carbs": 0, "fiber": 0, "cost": 0}
         self.grocery_list = []
+        
 
-    def get_price_for_item(self, api_description):
+        self.pantry = []
+        self.pantry_inventory = []
+
+        self.price_db = self._load_price_database()
+
+    def _load_price_database(self):
         try:
             with open('data/prices.json', 'r') as f:
-                price_db = json.load(f)
+                return {k.lower(): v for k, v in json.load(f).items()}
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"⚠️ Warning: Could not load price database ({e}). Using empty dictionary.")
+            return {}
+
+    def add_to_pantry(self, food_description, servings=1):
+        self.pantry.append(food_description.lower())
+        self.pantry_inventory.append((food_description, servings))
+    def get_price_for_item(self, api_description):
+        if not self.price_db:
+            return None
             
-            # Convert the API description to lowercase once
+        try:
             desc_lower = api_description.lower()
             
-            # 1. Try an exact match first
-            if desc_lower in price_db:
-                return price_db[desc_lower]
+            if desc_lower in self.price_db:
+                return self.price_db[desc_lower]
             
-            # 2. Loop through our price database and look for partial matches
-            for item_name, price in price_db.items():
-                # If our price list name is inside the API description (e.g., "chicken" in "CHICKEN BREAST")
-                # OR if the API name is inside our price list
+            for item_name, price in self.price_db.items():
                 if item_name in desc_lower or desc_lower in item_name:
                     return price
             
-            # 3. Last ditch effort: Check individual words
             api_words = set(desc_lower.replace(',', '').split())
-            for item_name, price in price_db.items():
+            for item_name, price in self.price_db.items():
                 if any(word in item_name for word in api_words if len(word) > 3):
                     return price
 
@@ -35,39 +46,55 @@ class WeeklyMealPlan:
         except Exception as e:
             print(f"Match Error: {e}")
             return None
-    def add_food(self, food_data, servings=1):
-        # 1. Automatically find the price
-        price_per_unit = self.get_price_for_item(food_data['description'])
+
+    def add_food(self, food_data, servings=1, force=False, is_pantry_setup=False):
+        desc_lower = food_data['description'].lower()
         
-        if price_per_unit is None:
-            print(f"Could not find price for {food_data['description']}. Using $0.00 estimate.")
+        is_owned = desc_lower in self.pantry        
+        if is_owned or is_pantry_setup:
             price_per_unit = 0.0
+        else:
+            price_per_unit = self.get_price_for_item(food_data['description'])
+            if price_per_unit is None:
+                price_per_unit = 0.0
 
-        # Calculate impact
         cost = price_per_unit * servings
-        calories_to_add = food_data['calories'] * servings
+        
+        upcoming_additions = {
+            "cost": cost,
+            "calories": food_data['calories'] * servings,
+            "protein": food_data['protein'] * servings,
+            "carbs": food_data['carbs'] * servings,
+            "fat": food_data['fat'] * servings,
+            "fiber": food_data['fiber'] * servings
+        }
 
-        # 2. VALIDATION GATE (Budget & Calories)
-        # Check Budget
-        if (self.current_totals["cost"] + cost) > self.targets["cost"]:
-            print(f"❌ DENIED: Adding this exceeds your weekly budget by ${((self.current_totals['cost'] + cost) - self.targets['cost']):.2f}!!")
-            return False
-            
-        # Check Calories (Preventing the negative)
-        if (self.current_totals["calories"] + calories_to_add) > self.targets["calories"]:
-            print(f"❌ DENIED: Adding this exceeds your calorie limit by {(self.current_totals['calories'] + calories_to_add - self.targets['calories']):.0f} kcal!!")
-            return False
+        if not force:
+            if (self.current_totals["cost"] + upcoming_additions["cost"]) > self.targets["cost"]:
+                return "OVER_BUDGET"
+            if (self.current_totals["calories"] + upcoming_additions["calories"]) > self.targets["calories"]:
+                return "OVER_CALORIES"
+                
+            for macro in ["protein", "carbs", "fat", "fiber"]:
+                if (self.current_totals[macro] + upcoming_additions[macro]) > self.targets[macro]:
+                    return f"OVER_{macro.upper()}"
 
-        # 3. If it passes the checks, update Totals
         self.current_totals["cost"] += cost
-        self.grocery_list.append((food_data['description'], servings))
         
-        for macro in ["calories", "protein", "fat", "carbs", "fiber"]:
-            self.current_totals[macro] += food_data[macro] * servings
+        if is_pantry_setup:
+            self.pantry.append(food_data['description'].lower())
+            self.pantry_inventory.append((food_data['description'], servings))
+            print(f"🏠 Added {food_data['description']} to home inventory supply.")
+        elif is_owned:
+            print(f"🏠 Inventory Match! Using {food_data['description']} from your home supply.")
+        else:
+            self.grocery_list.append((food_data['description'], servings))
+            print(f"✅ Added {food_data['description']} to grocery shopping list! (Cost: ${cost:.2f})")
         
-        print(f"✅ Added {food_data['description']}! (Cost: ${cost:.2f})")
+        for key in ["calories", "protein", "fat", "carbs", "fiber"]:
+            self.current_totals[key] += upcoming_additions[key]
+        
         return True
     
     def get_remaining(self):
-        # Cleaned up the dictionary comprehension syntax here
         return {k: self.targets[k] - self.current_totals[k] for k in self.current_totals}
