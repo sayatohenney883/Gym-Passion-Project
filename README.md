@@ -10,7 +10,7 @@ That's where this passion project comes in. The goal with this passion project i
 On top of that, there will be an option that allows the user to input food that they already have at home, so determining your shopping for the week is nothing but a simple task. 
 
 This passion project's goal is simple: to create an easy-to-use shopping cart planner for your meals throughout the week.
-In addition, this project is an opportunity to enhance my coding knowledge in hopes of achieving a higher level of expertise as a result of completing this project. 
+In addition, this project is an opportunity to enhance my coding knowledge in hopes of achieving a higher level of expertise.
 
 Thank you!
 
